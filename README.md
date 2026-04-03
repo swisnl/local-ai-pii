@@ -103,7 +103,9 @@ Clears all PII from memory, destroys the `LanguageModel` session, and removes th
 
 ## Categories
 
-Token keys are language-neutral. Labels and which categories are active vary by locale.
+The built-in categories below have dedicated regex patterns for high-confidence structured detection. When Gemini Nano is available it can also detect **any additional PII type** it recognises in context — these extra types are LLM-only and are passed through using whatever label the model returns (e.g. `PASSPORT`, `DATE_OF_BIRTH`).
+
+Token keys are language-neutral. Labels vary by locale.
 
 ### Dutch (`language: 'nl'`)
 
@@ -116,6 +118,7 @@ Token keys are language-neutral. Labels and which categories are active vary by 
 | `postcode` | `POSTCODE` | `[POSTCODE_N]` | Regex |
 | `BSN` | `BSN` | `[BSN_N]` | Regex + elfproef |
 | `IBAN` | `IBAN` | `[IBAN_N]` | Regex |
+| *(any)* | *(model-defined)* | `[TYPE_N]` | LLM only |
 
 BSN tokens are stripped (not restored) in `restore()` — Dutch law (Wabb) requires this.
 
@@ -129,8 +132,11 @@ BSN tokens are stripped (not restored) in `restore()` — Dutch law (Wabb) requi
 | `address` | `ADDRESS` | `[ADDRESS_N]` | LLM |
 | `postcode` | `POSTCODE` | `[POSTCODE_N]` | Regex (UK + US ZIP) |
 | `IBAN` | `IBAN` | `[IBAN_N]` | Regex (any country) |
+| *(any)* | *(model-defined)* | `[TYPE_N]` | LLM only |
 
-Pass a subset to `options.categories` to limit detection. Both canonical keys and locale labels are accepted:
+### Filtering categories
+
+Pass a subset to `options.categories` to limit detection. Both canonical keys and locale labels are accepted. LLM-only types (those without a regex pattern) are included when `categories` is omitted, and excluded when a specific list is provided unless explicitly named.
 
 ```js
 // Dutch mode — Dutch label
