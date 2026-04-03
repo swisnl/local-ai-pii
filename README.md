@@ -1,4 +1,4 @@
-# chrome-local-ai-pii
+# local-ai-pii
 
 Client-side PII redaction for Dutch text using the browser's built-in AI (Gemini Nano via `LanguageModel` API) with a regex fallback for structured patterns.
 
@@ -12,7 +12,7 @@ Intercepts questions before they leave the browser, replaces PII with numbered p
 "Bel Jan de Vries op 06-12345678" ← shown to user
 ```
 
-**[→ Live demo](https://bjorn.github.io/chrome-local-ai-pii/)**
+**[→ Live demo](https://bjorn.github.io/local-ai-pii/)**
 
 ---
 
@@ -32,7 +32,7 @@ When `LanguageModel` is unavailable (wrong browser, no GPU, no origin trial), th
 ## Installation
 
 ```bash
-npm install chrome-local-ai-pii
+npm install local-ai-pii
 ```
 
 Or copy `src/` into your project — the module has zero runtime dependencies.
@@ -42,7 +42,7 @@ Or copy `src/` into your project — the module has zero runtime dependencies.
 ## Usage
 
 ```js
-import { createPiiFilter } from 'chrome-local-ai-pii'
+import { createPiiFilter } from 'local-ai-pii'
 
 const filter = await createPiiFilter({
     onPiiFound: ({ replacements }) => {
@@ -124,7 +124,7 @@ const filter = await createPiiFilter({
 
 ```js
 // Run.js — initialise once per conversation
-import { createPiiFilter } from 'chrome-local-ai-pii'
+import { createPiiFilter } from 'local-ai-pii'
 
 const filter = await createPiiFilter({
     onPiiFound: ({ replacements }) => emit('pii-replaced', replacements),

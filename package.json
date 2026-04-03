@@ -1,5 +1,5 @@
 {
-    "name": "chrome-local-ai-pii",
+    "name": "local-ai-pii",
     "version": "0.1.0",
     "description": "Client-side PII redaction for Dutch text using Chrome's built-in Gemini Nano (LanguageModel API)",
     "type": "module",

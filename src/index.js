@@ -1,11 +1,11 @@
 /**
- * chrome-local-ai-pii
+ * local-ai-pii
  *
  * Client-side PII redaction for Dutch text using Chrome's built-in Gemini Nano.
  *
  * Usage (vragen.ai Run.js integration example):
  *
- *   import { createPiiFilter } from 'chrome-local-ai-pii'
+ *   import { createPiiFilter } from 'local-ai-pii'
  *
  *   const filter = await createPiiFilter({
  *     onPiiFound: ({ replacements }) => {
