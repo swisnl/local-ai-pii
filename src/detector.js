@@ -66,7 +66,7 @@ export async function createDetector({ activeKeys, signal } = {}) {
             if (activeKeys && !activeKeys.has(key)) continue
             const matches = findMatches(key, text)
             for (const match of matches) {
-                entities.push({ type: key, value: match.value })
+                entities.push({ type: key, value: match.value, source: 'regex' })
             }
         }
 
@@ -157,9 +157,13 @@ export async function createDetector({ activeKeys, signal } = {}) {
             finalText = finalText.split(entity.value).join(token)
         }
 
+        const usedLlmEntities = filteredLlm
+            .filter(e => seenValues.has(e.value))
+            .map(e => ({ ...e, source: 'llm' }))
+
         return {
             text: finalText,
-            entities: [...regexEntities, ...filteredLlm.filter(e => seenValues.has(e.value))],
+            entities: [...regexEntities, ...usedLlmEntities],
         }
     }
 

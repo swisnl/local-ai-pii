@@ -35,7 +35,7 @@
 
 import { createDetector } from './detector.js'
 import { PiiSession } from './session.js'
-import { resolveActiveKeys } from './categories.js'
+import { resolveActiveKeys, CATEGORIES } from './categories.js'
 
 /**
  * Creates a PII filter instance.
@@ -85,15 +85,26 @@ export async function createPiiFilter(options = {}) {
         currentSession.destroy()
         currentSession = new PiiSession()
 
-        const { text: redacted } = await detector.detect(
+        const { text: redacted, entities } = await detector.detect(
             text,
             (key, value) => currentSession.getOrCreateToken(key, value),
             signal
         )
 
         if (currentSession.hasReplacements()) {
+            // Build replacements from the entities list so we can include source (regex/llm).
+            // Deduplicate by token — the same value may appear multiple times in entities.
+            const seen = new Set()
+            const replacements = []
+            for (const entity of entities) {
+                const token = currentSession.getToken(entity.value)
+                if (!token || seen.has(token)) continue
+                seen.add(token)
+                const cat = CATEGORIES[entity.type]
+                replacements.push({ token, type: cat?.label ?? entity.type.toLowerCase(), source: entity.source })
+            }
             try {
-                onPiiFound?.({ replacements: currentSession.getReplacements() })
+                onPiiFound?.({ replacements })
             } catch (err) {
                 console.warn('[pii-filter] onPiiFound callback threw an error', err)
             }

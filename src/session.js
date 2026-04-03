@@ -54,6 +54,17 @@ export class PiiSession {
     }
 
     /**
+     * Returns the token previously minted for a given original value, or undefined.
+     * Used by the detector to associate entity source (regex/llm) with tokens.
+     *
+     * @param {string} value
+     * @returns {string | undefined}
+     */
+    getToken(value) {
+        return this.#valueToToken.get(value)
+    }
+
+    /**
      * Returns true if this session has any replacements.
      *
      * @returns {boolean}

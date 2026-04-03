@@ -84,7 +84,9 @@ describe('createPiiFilter — onPiiFound callback', () => {
 
         expect(onPiiFound).toHaveBeenCalledOnce()
         const { replacements } = onPiiFound.mock.calls[0][0]
-        expect(replacements).toContainEqual({ token: '[EMAIL_1]', type: 'e-mail' })
+        expect(replacements[0].token).toBe('[EMAIL_1]')
+        expect(replacements[0].type).toBe('e-mail')
+        expect(['regex', 'llm']).toContain(replacements[0].source)
 
         // Verify original value is not in the payload
         expect(JSON.stringify(replacements)).not.toContain('jan@example.com')
