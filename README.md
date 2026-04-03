@@ -12,7 +12,7 @@ Intercepts questions before they leave the browser, replaces PII with numbered p
 "Bel Jan de Vries op 06-12345678" ← shown to user
 ```
 
-**[→ Live demo](https://bjorn.github.io/local-ai-pii/)**
+**[→ Live demo](https://swisnl.github.io/local-ai-pii/)**
 
 ---
 
