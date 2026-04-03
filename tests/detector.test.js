@@ -161,6 +161,31 @@ describe('createDetector — with mocked LanguageModel', () => {
         expect(result.text).toContain('Keizersgracht 1')
     })
 
+    it('does not create a nested token when LLM returns an existing token as a value', async () => {
+        // Regex replaces a postcode → [POSTCODE_1]. The LLM sees "[POSTCODE_1]" in the text
+        // and echoes it back as an entity value. Gemini Nano may strip the brackets
+        // and return "POSTCODE_1" instead of "[POSTCODE_1]". Both must be ignored.
+        vi.stubGlobal('LanguageModel', mockLanguageModel([
+            { type: 'NAME', value: 'Jan de Vries' },
+            { type: 'POSTCODE', value: 'POSTCODE_1' }, // Gemini Nano strips brackets
+        ]))
+
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['NAME', 'POSTCODE']) })
+        const { mintToken, session } = makeSession()
+
+        const result = await detector.detect(
+            'Jan de Vries woont in 1015 CJ',
+            mintToken,
+            undefined
+        )
+        // [POSTCODE_1] should be in the text, NOT [POSTCODE_2]
+        expect(result.text).not.toContain('[POSTCODE_2]')
+        expect(result.text).toContain('[POSTCODE_1]')
+        // Restoring should give back the real postcode, not a token string
+        expect(session.restore(result.text)).not.toContain('[POSTCODE_1]')
+        expect(session.restore(result.text)).toContain('1015 CJ')
+    })
+
     it('does not double-redact a value already caught by regex', async () => {
         // LLM also claims the email that regex already caught
         vi.stubGlobal('LanguageModel', mockLanguageModel([

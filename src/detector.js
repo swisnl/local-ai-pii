@@ -186,9 +186,15 @@ export async function createDetector({ locale, activeKeys, signal, onDownloadPro
 
         let finalText = afterRegex
         const seenValues = new Set(regexEntities.map(e => e.value))
+        // Regex replacements leave tokens like [TYPE_N] in the text. The LLM sees these
+        // and sometimes returns them as entity values — either as "[PHONE_1]" (with brackets)
+        // or as "PHONE_1" (Gemini Nano strips brackets). Skip both forms, otherwise
+        // mintToken would store a token string as the "original value", breaking restore().
+        const tokenPattern = /^\[?[A-Z]+_\d+\]?$/
 
         for (const entity of filteredLlm) {
             if (seenValues.has(entity.value)) continue
+            if (tokenPattern.test(entity.value.trim())) continue
             // Only replace if the value still appears in the text (not already caught by regex)
             if (!finalText.includes(entity.value)) continue
             seenValues.add(entity.value)
