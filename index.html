@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -592,7 +592,7 @@ function applyLocaleUI(lang) {
 
 // ── filter state ──────────────────────────────────────────────────────────────
 let filter = null
-let currentLang = 'nl'
+let currentLang = 'en'
 
 async function initFilter(lang) {
     if (filter) {
@@ -654,8 +654,8 @@ async function initFilter(lang) {
 }
 
 // ── boot ──────────────────────────────────────────────────────────────────────
-applyLocaleUI('nl')
-initFilter('nl')
+applyLocaleUI('en')
+initFilter('en')
 
 // ── language switcher ─────────────────────────────────────────────────────────
 langBtns.forEach(btn => {

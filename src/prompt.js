@@ -37,7 +37,8 @@ Als er geen PII is gevonden, geef dan een lege array terug.`
 /**
  * JSON Schema for the responseConstraint option of LanguageModel.prompt().
  * Forces the model to return a valid JSON array of PII entities.
- * Token keys are language-neutral English regardless of locale.
+ * The type field accepts any non-empty string — filtering to known/active
+ * categories happens in detector.js, keeping the schema locale-agnostic.
  */
 export const PII_EXTRACTION_SCHEMA = {
     type: 'array',
@@ -46,11 +47,8 @@ export const PII_EXTRACTION_SCHEMA = {
         required: ['type', 'value'],
         additionalProperties: false,
         properties: {
-            type: {
-                type: 'string',
-                enum: ['NAME', 'EMAIL', 'ADDRESS', 'POSTCODE', 'PHONE', 'BSN', 'IBAN'],
-            },
-            value: { type: 'string' },
+            type:  { type: 'string', minLength: 1 },
+            value: { type: 'string', minLength: 1 },
         },
     },
 }
@@ -118,13 +116,12 @@ export function buildUserMessage(text) {
  */
 export function validateEntities(parsed) {
     if (!Array.isArray(parsed)) return []
-    const validTypes = new Set(PII_EXTRACTION_SCHEMA.items.properties.type.enum)
     return parsed.filter(
         entry =>
             entry !== null &&
             typeof entry === 'object' &&
             typeof entry.type === 'string' &&
-            validTypes.has(entry.type) &&
+            entry.type.length > 0 &&
             typeof entry.value === 'string' &&
             entry.value.length > 0
     )

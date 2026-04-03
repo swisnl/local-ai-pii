@@ -53,15 +53,11 @@ describe('PII_EXTRACTION_SCHEMA', () => {
         expect(PII_EXTRACTION_SCHEMA.items.required).toContain('value')
     })
 
-    it('enumerates the expected PII types', () => {
-        const types = PII_EXTRACTION_SCHEMA.items.properties.type.enum
-        expect(types).toContain('NAME')
-        expect(types).toContain('EMAIL')
-        expect(types).toContain('PHONE')
-        expect(types).toContain('ADDRESS')
-        expect(types).toContain('POSTCODE')
-        expect(types).toContain('BSN')
-        expect(types).toContain('IBAN')
+    it('accepts any non-empty string for type (no hardcoded enum)', () => {
+        const typeProp = PII_EXTRACTION_SCHEMA.items.properties.type
+        expect(typeProp.type).toBe('string')
+        expect(typeProp.minLength).toBe(1)
+        expect(typeProp.enum).toBeUndefined()
     })
 })
 
@@ -80,14 +76,18 @@ describe('validateEntities', () => {
         expect(validateEntities('string')).toHaveLength(0)
     })
 
-    it('filters out entries with unknown type', () => {
+    it('accepts entries with any non-empty type string', () => {
         const input = [
             { type: 'NAME', value: 'Jan' },
-            { type: 'UNKNOWN', value: 'something' },
+            { type: 'SOME_FUTURE_TYPE', value: 'something' },
         ]
-        const result = validateEntities(input)
-        expect(result).toHaveLength(1)
-        expect(result[0].type).toBe('NAME')
+        // validateEntities no longer rejects unknown types — the detector filters to active categories
+        expect(validateEntities(input)).toHaveLength(2)
+    })
+
+    it('filters out entries with empty type', () => {
+        const input = [{ type: '', value: 'Jan' }]
+        expect(validateEntities(input)).toHaveLength(0)
     })
 
     it('filters out entries with missing value', () => {
