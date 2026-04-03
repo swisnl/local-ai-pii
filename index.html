@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chrome-local-ai-pii — PII filter demo</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --blue:    #2563eb;
+            --blue-lt: #eff6ff;
+            --green:   #16a34a;
+            --green-lt:#f0fdf4;
+            --red:     #dc2626;
+            --red-lt:  #fef2f2;
+            --amber:   #d97706;
+            --amber-lt:#fffbeb;
+            --gray-50: #f9fafb;
+            --gray-100:#f3f4f6;
+            --gray-200:#e5e7eb;
+            --gray-400:#9ca3af;
+            --gray-600:#4b5563;
+            --gray-800:#1f2937;
+            --radius:  8px;
+            --shadow:  0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--gray-800);
+            background: var(--gray-50);
+            min-height: 100vh;
+        }
+
+        /* ── header ── */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 20px 24px;
+        }
+        header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -.3px;
+        }
+        header h1 span { color: var(--blue); }
+        header p {
+            color: var(--gray-600);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        /* ── status bar ── */
+        #status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--gray-200);
+            background: white;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gray-400);
+            flex-shrink: 0;
+        }
+        .status-dot.checking { background: var(--amber); animation: pulse 1.2s infinite; }
+        .status-dot.available { background: var(--green); }
+        .status-dot.unavailable { background: var(--amber); }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* ── main layout ── */
+        main {
+            max-width: 900px;
+            margin: 32px auto;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* ── cards ── */
+        .card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--gray-100);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-header h2 {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--gray-600);
+        }
+        .step-badge {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--blue);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .card-body { padding: 20px; }
+
+        /* ── inputs ── */
+        textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            background: var(--gray-50);
+            transition: border-color .15s;
+        }
+        textarea:focus { outline: none; border-color: var(--blue); background: white; }
+
+        /* ── buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 18px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all .15s;
+        }
+        .btn-primary {
+            background: var(--blue);
+            color: white;
+        }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: var(--gray-400); cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-800);
+            border: 1px solid var(--gray-200);
+        }
+        .btn-secondary:hover { background: var(--gray-200); }
+
+        /* ── result panels ── */
+        .result-panel {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 14px;
+            font-size: 14px;
+            line-height: 1.7;
+            min-height: 60px;
+            word-break: break-word;
+        }
+        .result-panel.is-redacted {
+            background: var(--red-lt);
+            border-color: #fca5a5;
+        }
+        .result-panel.is-restored {
+            background: var(--green-lt);
+            border-color: #86efac;
+        }
+        .result-panel .placeholder {
+            display: inline-block;
+            background: var(--red);
+            color: white;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            margin: 0 1px;
+            letter-spacing: -.3px;
+        }
+        .result-panel .restored {
+            display: inline-block;
+            background: var(--green);
+            color: white;
+            font-size: 13px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            margin: 0 1px;
+        }
+
+        /* ── pii badges ── */
+        .pii-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .pii-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--red-lt);
+            border: 1px solid #fca5a5;
+            border-radius: 99px;
+            padding: 3px 10px 3px 7px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--red);
+        }
+        .pii-badge-token {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            opacity: .7;
+        }
+        .pii-badge-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--red);
+            border-radius: 50%;
+        }
+
+        /* ── flow arrow ── */
+        .flow-arrow {
+            display: flex;
+            justify-content: center;
+            color: var(--gray-400);
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        /* ── label rows ── */
+        .label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            color: var(--gray-600);
+        }
+
+        /* ── empty state ── */
+        .empty { color: var(--gray-400); font-style: italic; font-size: 13px; }
+
+        /* ── example chips ── */
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .example-chip {
+            padding: 4px 10px;
+            background: var(--blue-lt);
+            border: 1px solid #bfdbfe;
+            border-radius: 99px;
+            font-size: 12px;
+            color: var(--blue);
+            cursor: pointer;
+            transition: all .1s;
+            font-weight: 500;
+        }
+        .example-chip:hover { background: #dbeafe; }
+
+        /* ── processing indicator ── */
+        .processing {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--gray-600);
+            font-size: 13px;
+        }
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--gray-200);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── footer ── */
+        footer {
+            text-align: center;
+            padding: 32px 24px;
+            font-size: 12px;
+            color: var(--gray-400);
+        }
+        footer a { color: var(--gray-600); }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1><span>chrome-local-ai-pii</span> — demo</h1>
+    <p>PII-redactie voor Dutch tekst, client-side via Gemini Nano of regex-fallback</p>
+</header>
+
+<div id="status-bar">
+    <div class="status-dot checking" id="status-dot"></div>
+    <span id="status-text">Controleren van LanguageModel API...</span>
+</div>
+
+<main>
+
+    <!-- Step 1: input -->
+    <div class="card">
+        <div class="card-header">
+            <div class="step-badge">1</div>
+            <h2>Typ een vraag met persoonsgegevens</h2>
+        </div>
+        <div class="card-body">
+            <textarea id="question" rows="4"
+                placeholder="Typ hier een vraag die PII bevat, bijv. een naam, e-mailadres of telefoonnummer..."></textarea>
+
+            <div class="examples">
+                <span class="label" style="align-self:center">Voorbeelden:</span>
+                <button class="example-chip" data-example="Bel Jan de Vries op 06-12345678 of stuur een mail naar jan@voorbeeld.nl. Hij woont op Keizersgracht 1, 1015 CJ.">naam + telefoon + e-mail + adres</button>
+                <button class="example-chip" data-example="Mijn BSN is 111222333 en mijn IBAN is NL91ABNA0417164300.">BSN + IBAN</button>
+                <button class="example-chip" data-example="Mijn moeder is 62 jaar en heeft last van hoofdpijn. Ze gaat naar de huisarts.">geen PII (rollen/leeftijd)</button>
+            </div>
+
+            <div style="margin-top:16px; display:flex; justify-content:flex-end">
+                <button class="btn btn-primary" id="redact-btn" disabled>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Filter en verstuur
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <!-- Step 2: redacted output -->
+    <div class="card">
+        <div class="card-header">
+            <div class="step-badge">2</div>
+            <h2>Verzonden naar de server (PII verwijderd)</h2>
+        </div>
+        <div class="card-body">
+            <div id="redacted-output" class="result-panel">
+                <span class="empty">Nog geen vraag verstuurd.</span>
+            </div>
+            <div id="pii-list" class="pii-list"></div>
+        </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <!-- Step 3: simulated server response -->
+    <div class="card">
+        <div class="card-header">
+            <div class="step-badge">3</div>
+            <h2>Gesimuleerd serverantwoord</h2>
+        </div>
+        <div class="card-body">
+            <p style="font-size:13px; color:var(--gray-600); margin-bottom:10px">
+                Bewerk het antwoord hieronder. De server kent alleen de tokens — pas ze aan of laat ze staan.
+            </p>
+            <textarea id="server-response" rows="3"
+                placeholder="Serverantwoord verschijnt hier nadat u een vraag heeft verstuurd..."></textarea>
+            <div style="margin-top:12px; display:flex; justify-content:flex-end">
+                <button class="btn btn-secondary" id="restore-btn" disabled>
+                    Herstel persoonsgegevens →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <!-- Step 4: restored answer -->
+    <div class="card">
+        <div class="card-header">
+            <div class="step-badge">4</div>
+            <h2>Getoond aan de gebruiker (persoonsgegevens hersteld)</h2>
+        </div>
+        <div class="card-body">
+            <div id="restored-output" class="result-panel">
+                <span class="empty">Nog geen antwoord hersteld.</span>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <a href="https://github.com/bjorn/chrome-local-ai-pii">github.com/bjorn/chrome-local-ai-pii</a>
+    &nbsp;·&nbsp;
+    PII blijft in de browser — nooit verstuurd naar de server
+</footer>
+
+<script type="module">
+import { createPiiFilter } from './src/index.js'
+
+// ── token highlight helpers ───────────────────────────────────────────────────
+const TOKEN_RE = /(\[[A-Z]+_\d+\])/g
+
+function renderRedacted(text) {
+    return text.replace(TOKEN_RE, (token) =>
+        `<span class="placeholder">${token}</span>`
+    )
+}
+
+function renderRestored(original, restored) {
+    // Find tokens in original and highlight the values that replaced them
+    // by comparing original vs restored character by character would be complex,
+    // so instead we highlight spans in the restored text that correspond to
+    // segments that were tokens in the original.
+    const parts = original.split(TOKEN_RE)
+    let restoredCursor = restored
+    let html = ''
+
+    for (const part of parts) {
+        if (TOKEN_RE.test(part)) {
+            TOKEN_RE.lastIndex = 0
+            // This part is a token — figure out what it resolved to
+            // by finding the corresponding span in the restored text
+            // We use a simpler approach: just highlight all of restored
+            // We can get the restored value by checking the restored text
+        }
+    }
+
+    // Simpler approach: mark restored segments by diffing
+    // For demo purposes, just show the text with a note
+    return restored
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+const questionEl = document.getElementById('question')
+const redactBtn  = document.getElementById('redact-btn')
+const restoreBtn = document.getElementById('restore-btn')
+const redactedEl = document.getElementById('redacted-output')
+const piiListEl  = document.getElementById('pii-list')
+const serverEl   = document.getElementById('server-response')
+const restoredEl = document.getElementById('restored-output')
+const statusDot  = document.getElementById('status-dot')
+const statusText = document.getElementById('status-text')
+
+function setStatus(state, text) {
+    statusDot.className = `status-dot ${state}`
+    statusText.textContent = text
+}
+
+function setProcessing(btn, label) {
+    btn.disabled = true
+    btn.innerHTML = `<span class="processing"><span class="spinner"></span>${label}</span>`
+}
+
+// ── initialise filter ─────────────────────────────────────────────────────────
+let filter = null
+
+;(async () => {
+    setStatus('checking', 'Controleren van LanguageModel API…')
+
+    filter = await createPiiFilter({
+        onPiiFound: ({ replacements }) => {
+            piiListEl.innerHTML = ''
+            for (const { token, type } of replacements) {
+                const badge = document.createElement('span')
+                badge.className = 'pii-badge'
+                badge.innerHTML = `
+                    <span class="pii-badge-dot"></span>
+                    ${type}
+                    <span class="pii-badge-token">${token}</span>
+                `
+                piiListEl.appendChild(badge)
+            }
+        },
+    })
+
+    // Check LM availability for status display
+    if (globalThis.LanguageModel) {
+        try {
+            const avail = await LanguageModel.availability({ expectedInputs: [{ type: 'text' }] })
+            if (avail === 'available') {
+                setStatus('available', 'LanguageModel (Gemini Nano) beschikbaar — namen en adressen worden ook gedetecteerd')
+            } else {
+                setStatus('unavailable', `LanguageModel: ${avail} — alleen regex-detectie (e-mail, telefoon, postcode, IBAN, BSN)`)
+            }
+        } catch {
+            setStatus('unavailable', 'LanguageModel niet beschikbaar — alleen regex-detectie actief')
+        }
+    } else {
+        setStatus('unavailable', 'LanguageModel API niet gevonden — alleen regex-detectie actief (regex detecteert e-mail, telefoon, postcode, IBAN, BSN)')
+    }
+
+    redactBtn.disabled = false
+    redactBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Filter en verstuur
+    `
+})()
+
+// ── example chips ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.example-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        questionEl.value = chip.dataset.example
+        questionEl.dispatchEvent(new Event('input'))
+    })
+})
+
+// ── redact ────────────────────────────────────────────────────────────────────
+redactBtn.addEventListener('click', async () => {
+    const text = questionEl.value.trim()
+    if (!text || !filter) return
+
+    const originalLabel = redactBtn.innerHTML
+    setProcessing(redactBtn, 'Verwerken…')
+
+    // Clear previous state
+    piiListEl.innerHTML = ''
+    redactedEl.className = 'result-panel'
+    redactedEl.innerHTML = '<span class="empty">Verwerken…</span>'
+    serverEl.value = ''
+    restoredEl.className = 'result-panel'
+    restoredEl.innerHTML = '<span class="empty">Nog geen antwoord hersteld.</span>'
+    restoreBtn.disabled = true
+
+    try {
+        const redacted = await filter.redact(text)
+
+        if (redacted === text) {
+            redactedEl.className = 'result-panel'
+            redactedEl.innerHTML = `<em style="color:var(--green)">${escHtml(text)}</em> <span style="font-size:12px;color:var(--gray-400)">(geen PII gevonden)</span>`
+            piiListEl.innerHTML = ''
+        } else {
+            redactedEl.className = 'result-panel is-redacted'
+            redactedEl.innerHTML = renderRedacted(escHtml(redacted))
+        }
+
+        // Pre-populate server response with a natural sentence using the tokens
+        serverEl.value = buildSimulatedResponse(redacted)
+        restoreBtn.disabled = false
+
+    } finally {
+        redactBtn.disabled = false
+        redactBtn.innerHTML = originalLabel
+    }
+})
+
+// ── restore ───────────────────────────────────────────────────────────────────
+restoreBtn.addEventListener('click', () => {
+    if (!filter) return
+    const serverText = serverEl.value
+    const restored = filter.restore(serverText)
+
+    restoredEl.className = 'result-panel is-restored'
+    restoredEl.innerHTML = escHtml(restored)
+        .replace(TOKEN_RE, (token) => `<span class="placeholder">${token}</span>`)
+
+    restoreBtn.disabled = true
+})
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function escHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+}
+
+function buildSimulatedResponse(redacted) {
+    // Extract tokens from the redacted text to build a plausible server response
+    const tokens = [...redacted.matchAll(/\[[A-Z]+_\d+\]/g)].map(m => m[0])
+
+    if (tokens.length === 0) {
+        return 'Bedankt voor uw vraag. Wij hebben uw vraag ontvangen en zullen zo snel mogelijk reageren.'
+    }
+
+    const tokenList = tokens.join(' en ')
+    return `Bedankt voor uw vraag. Wij hebben uw gegevens ontvangen (${tokenList}) en nemen zo spoedig mogelijk contact op.`
+}
+</script>
+
+</body>
+</html>
