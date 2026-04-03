@@ -43,7 +43,7 @@ describe('createPiiFilter — regex redaction roundtrip', () => {
     it('redacts a Dutch phone number', async () => {
         const filter = await createPiiFilter()
         const redacted = await filter.redact('Bel mij op 0612345678')
-        expect(redacted).toBe('Bel mij op [TELEFOON_1]')
+        expect(redacted).toBe('Bel mij op [PHONE_1]')
     })
 
     it('redacts a Dutch postcode', async () => {
@@ -114,19 +114,19 @@ describe('createPiiFilter — onPiiFound callback', () => {
 
 describe('createPiiFilter — LLM name detection', () => {
     it('redacts a name found by the LLM', async () => {
-        vi.stubGlobal('LanguageModel', mockLM([{ type: 'NAAM', value: 'Jan de Vries' }]))
+        vi.stubGlobal('LanguageModel', mockLM([{ type: 'NAME', value: 'Jan de Vries' }]))
 
         const filter = await createPiiFilter()
         const redacted = await filter.redact('Bel Jan de Vries morgen.')
-        expect(redacted).toBe('Bel [NAAM_1] morgen.')
+        expect(redacted).toBe('Bel [NAME_1] morgen.')
     })
 
     it('restores a name token in the answer', async () => {
-        vi.stubGlobal('LanguageModel', mockLM([{ type: 'NAAM', value: 'Jan de Vries' }]))
+        vi.stubGlobal('LanguageModel', mockLM([{ type: 'NAME', value: 'Jan de Vries' }]))
 
         const filter = await createPiiFilter()
         await filter.redact('Bel Jan de Vries morgen.')
-        const restored = filter.restore('Bedankt, [NAAM_1] wordt teruggebeld.')
+        const restored = filter.restore('Bedankt, [NAME_1] wordt teruggebeld.')
         expect(restored).toBe('Bedankt, Jan de Vries wordt teruggebeld.')
     })
 })
@@ -139,8 +139,8 @@ describe('createPiiFilter — restore edge cases', () => {
     it('leaves unknown tokens unchanged (best-effort)', async () => {
         const filter = await createPiiFilter()
         await filter.redact('Mail jan@example.com')
-        const restored = filter.restore('Hallo [NAAM_99]')
-        expect(restored).toBe('Hallo [NAAM_99]')
+        const restored = filter.restore('Hallo [NAME_99]')
+        expect(restored).toBe('Hallo [NAME_99]')
     })
 
     it('strips BSN tokens in answers instead of restoring them', async () => {
@@ -164,10 +164,18 @@ describe('createPiiFilter — restore edge cases', () => {
 describe('createPiiFilter — category filtering', () => {
     beforeEach(() => stubUnavailableLM())
 
-    it('only redacts configured categories', async () => {
+    it('only redacts configured categories (Dutch label)', async () => {
         const filter = await createPiiFilter({ categories: ['e-mail'] })
 
         // Phone is not in categories — should pass through
+        const redacted = await filter.redact('Bel 0612345678 of mail jan@example.com')
+        expect(redacted).toContain('[EMAIL_1]')
+        expect(redacted).toContain('0612345678')
+    })
+
+    it('only redacts configured categories (canonical key)', async () => {
+        const filter = await createPiiFilter({ categories: ['EMAIL'] })
+
         const redacted = await filter.redact('Bel 0612345678 of mail jan@example.com')
         expect(redacted).toContain('[EMAIL_1]')
         expect(redacted).toContain('0612345678')
@@ -186,6 +194,76 @@ describe('createPiiFilter — destroy', () => {
 
         const result = filter.restore('[EMAIL_1] is uw adres')
         expect(result).toBe('[EMAIL_1] is uw adres')
+    })
+})
+
+// ─── language / locale switching ─────────────────────────────────────────────
+
+describe('createPiiFilter — language option', () => {
+    beforeEach(() => stubUnavailableLM())
+
+    it('defaults to nl when no language is specified', async () => {
+        const filter = await createPiiFilter()
+        // Dutch phone pattern should match
+        const redacted = await filter.redact('Bel 0612345678')
+        expect(redacted).toBe('Bel [PHONE_1]')
+    })
+
+    it('uses English locale patterns with language: "en"', async () => {
+        const filter = await createPiiFilter({ language: 'en' })
+        // UK phone with country code
+        const redacted = await filter.redact('Call +44 7700 900123')
+        expect(redacted).toContain('[PHONE_1]')
+    })
+
+    it('en locale redacts a UK postcode', async () => {
+        const filter = await createPiiFilter({ language: 'en' })
+        const redacted = await filter.redact('Address: SW1A 2AA')
+        expect(redacted).toContain('[POSTCODE_1]')
+    })
+
+    it('en locale returns English labels in onPiiFound', async () => {
+        const onPiiFound = vi.fn()
+        const filter = await createPiiFilter({ language: 'en', onPiiFound })
+        await filter.redact('Email john@example.com please')
+        expect(onPiiFound).toHaveBeenCalledOnce()
+        const { replacements } = onPiiFound.mock.calls[0][0]
+        expect(replacements[0].type).toBe('email')
+    })
+
+    it('nl locale returns Dutch labels in onPiiFound', async () => {
+        const onPiiFound = vi.fn()
+        const filter = await createPiiFilter({ language: 'nl', onPiiFound })
+        await filter.redact('Mail jan@example.com')
+        expect(onPiiFound).toHaveBeenCalledOnce()
+        const { replacements } = onPiiFound.mock.calls[0][0]
+        expect(replacements[0].type).toBe('e-mail')
+    })
+
+    it('en locale does not strip BSN tokens in restore()', async () => {
+        const filter = await createPiiFilter({ language: 'en' })
+        // Mint a BSN token manually via redact on a 9-digit number
+        // (NL BSN pattern not in EN locale, so use LLM mock approach or email)
+        // Instead test via restore directly: BSN tokens in EN are restored, not stripped
+        await filter.redact('Mail john@example.com')
+        // Inject a [BSN_1] token into the answer — EN locale should restore it, not strip it
+        // Since no BSN was redacted, the token is unknown; it stays unchanged (best-effort)
+        const result = filter.restore('Here is [BSN_1] info')
+        expect(result).toBe('Here is [BSN_1] info')
+    })
+
+    it('categories option accepts canonical key with en locale', async () => {
+        const filter = await createPiiFilter({ language: 'en', categories: ['EMAIL'] })
+        const redacted = await filter.redact('Call +44 7700 900123 or email john@example.com')
+        expect(redacted).toContain('[EMAIL_1]')
+        // Phone not in active categories
+        expect(redacted).toContain('+44 7700 900123')
+    })
+
+    it('categories option accepts English label with en locale', async () => {
+        const filter = await createPiiFilter({ language: 'en', categories: ['email'] })
+        const redacted = await filter.redact('Email john@example.com please')
+        expect(redacted).toBe('Email [EMAIL_1] please')
     })
 })
 

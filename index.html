@@ -40,6 +40,10 @@
             background: white;
             border-bottom: 1px solid var(--gray-200);
             padding: 20px 24px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
         }
         header h1 {
             font-size: 18px;
@@ -52,6 +56,31 @@
             font-size: 13px;
             margin-top: 2px;
         }
+
+        /* ── language switcher ── */
+        .lang-switcher {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .lang-btn {
+            padding: 5px 12px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--gray-200);
+            background: var(--gray-100);
+            color: var(--gray-600);
+            transition: all .15s;
+        }
+        .lang-btn:hover { background: var(--gray-200); }
+        .lang-btn.active {
+            background: var(--blue);
+            color: white;
+            border-color: var(--blue);
+        }
+        .lang-btn:disabled { opacity: .5; cursor: not-allowed; }
 
         /* ── status bar ── */
         #status-bar {
@@ -193,15 +222,6 @@
             margin: 0 1px;
             letter-spacing: -.3px;
         }
-        .result-panel .restored {
-            display: inline-block;
-            background: var(--green);
-            color: white;
-            font-size: 13px;
-            padding: 1px 6px;
-            border-radius: 4px;
-            margin: 0 1px;
-        }
 
         /* ── pii badges ── */
         .pii-list {
@@ -330,13 +350,19 @@
 <body>
 
 <header>
-    <h1><span>local-ai-pii</span> — demo</h1>
-    <p>PII-redactie voor Dutch tekst, client-side via Gemini Nano of regex-fallback</p>
+    <div>
+        <h1><span>local-ai-pii</span> — demo</h1>
+        <p id="header-subtitle">PII detection for Dutch text, client-side via Gemini Nano or regex fallback</p>
+    </div>
+    <div class="lang-switcher">
+        <button class="lang-btn active" id="lang-nl" data-lang="nl">NL</button>
+        <button class="lang-btn" id="lang-en" data-lang="en">EN</button>
+    </div>
 </header>
 
 <div id="status-bar">
     <div class="status-dot checking" id="status-dot"></div>
-    <span id="status-text">Controleren van LanguageModel API...</span>
+    <span id="status-text">Checking LanguageModel API…</span>
 </div>
 
 <main>
@@ -345,23 +371,20 @@
     <div class="card">
         <div class="card-header">
             <div class="step-badge">1</div>
-            <h2>Typ een vraag met persoonsgegevens</h2>
+            <h2 id="step1-title">Enter a question containing personal data</h2>
         </div>
         <div class="card-body">
             <textarea id="question" rows="4"
-                placeholder="Typ hier een vraag die PII bevat, bijv. een naam, e-mailadres of telefoonnummer..."></textarea>
+                placeholder="Type a question containing PII, e.g. a name, email address or phone number…"></textarea>
 
-            <div class="examples">
-                <span class="label" style="align-self:center">Voorbeelden:</span>
-                <button class="example-chip" data-example="Bel Jan de Vries op 06-12345678 of stuur een mail naar jan@voorbeeld.nl. Hij woont op Keizersgracht 1, 1015 CJ.">naam + telefoon + e-mail + adres</button>
-                <button class="example-chip" data-example="Mijn BSN is 111222333 en mijn IBAN is NL91ABNA0417164300.">BSN + IBAN</button>
-                <button class="example-chip" data-example="Mijn moeder is 62 jaar en heeft last van hoofdpijn. Ze gaat naar de huisarts.">geen PII (rollen/leeftijd)</button>
+            <div class="examples" id="examples-container">
+                <span class="label" style="align-self:center" id="examples-label">Examples:</span>
             </div>
 
             <div style="margin-top:16px; display:flex; justify-content:flex-end">
                 <button class="btn btn-primary" id="redact-btn" disabled>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Filter en verstuur
+                    <span id="redact-btn-label">Filter &amp; send</span>
                 </button>
             </div>
         </div>
@@ -373,11 +396,11 @@
     <div class="card">
         <div class="card-header">
             <div class="step-badge">2</div>
-            <h2>Verzonden naar de server (PII verwijderd)</h2>
+            <h2 id="step2-title">Sent to server (PII removed)</h2>
         </div>
         <div class="card-body">
             <div id="redacted-output" class="result-panel">
-                <span class="empty">Nog geen vraag verstuurd.</span>
+                <span class="empty" id="step2-empty">No question sent yet.</span>
             </div>
             <div id="pii-list" class="pii-list"></div>
         </div>
@@ -389,17 +412,17 @@
     <div class="card">
         <div class="card-header">
             <div class="step-badge">3</div>
-            <h2>Gesimuleerd serverantwoord</h2>
+            <h2 id="step3-title">Simulated server response</h2>
         </div>
         <div class="card-body">
-            <p style="font-size:13px; color:var(--gray-600); margin-bottom:10px">
-                Bewerk het antwoord hieronder. De server kent alleen de tokens — pas ze aan of laat ze staan.
+            <p style="font-size:13px; color:var(--gray-600); margin-bottom:10px" id="step3-hint">
+                Edit the response below. The server only knows the tokens — modify them or leave them as-is.
             </p>
             <textarea id="server-response" rows="3"
-                placeholder="Serverantwoord verschijnt hier nadat u een vraag heeft verstuurd..."></textarea>
+                placeholder="Server response appears here after you send a question…"></textarea>
             <div style="margin-top:12px; display:flex; justify-content:flex-end">
                 <button class="btn btn-secondary" id="restore-btn" disabled>
-                    Herstel persoonsgegevens →
+                    <span id="restore-btn-label">Restore personal data →</span>
                 </button>
             </div>
         </div>
@@ -411,11 +434,11 @@
     <div class="card">
         <div class="card-header">
             <div class="step-badge">4</div>
-            <h2>Getoond aan de gebruiker (persoonsgegevens hersteld)</h2>
+            <h2 id="step4-title">Shown to user (personal data restored)</h2>
         </div>
         <div class="card-body">
             <div id="restored-output" class="result-panel">
-                <span class="empty">Nog geen antwoord hersteld.</span>
+                <span class="empty" id="step4-empty">No answer restored yet.</span>
             </div>
         </div>
     </div>
@@ -425,11 +448,79 @@
 <footer>
     <a href="https://github.com/swisnl/local-ai-pii">github.com/swisnl/local-ai-pii</a>
     &nbsp;·&nbsp;
-    PII blijft in de browser — nooit verstuurd naar de server
+    <span id="footer-note">PII stays in the browser — never sent to the server</span>
 </footer>
 
 <script type="module">
 import { createPiiFilter } from './src/index.js'
+
+// ── i18n strings ──────────────────────────────────────────────────────────────
+const I18N = {
+    nl: {
+        subtitle:         'PII-redactie voor Dutch tekst, client-side via Gemini Nano of regex-fallback',
+        step1:            'Typ een vraag met persoonsgegevens',
+        step2:            'Verzonden naar de server (PII verwijderd)',
+        step3:            'Gesimuleerd serverantwoord',
+        step3hint:        'Bewerk het antwoord hieronder. De server kent alleen de tokens — pas ze aan of laat ze staan.',
+        step4:            'Getoond aan de gebruiker (persoonsgegevens hersteld)',
+        step2empty:       'Nog geen vraag verstuurd.',
+        step4empty:       'Nog geen antwoord hersteld.',
+        examplesLabel:    'Voorbeelden:',
+        redactBtn:        'Filter en verstuur',
+        restoreBtn:       'Herstel persoonsgegevens →',
+        processingLabel:  'Verwerken…',
+        footerNote:       'PII blijft in de browser — nooit verstuurd naar de server',
+        noPiiFound:       '(geen PII gevonden)',
+        statusChecking:   'Controleren van LanguageModel API…',
+        statusAvailable:  'Gemini Nano beschikbaar — namen en adressen worden ook gedetecteerd',
+        statusDownloading:'Gemini Nano downloadt… (model is ~1.7 GB, dit kan even duren)',
+        statusDownload2:  'Gemini Nano wordt al gedownload in de achtergrond…',
+        statusUnavailable:'LanguageModel: {avail} — alleen regex-detectie (e-mail, telefoon, postcode, IBAN, BSN)',
+        statusNotFound:   'LanguageModel API niet gevonden — alleen regex-detectie actief',
+        switchingLocale:  'Taal wisselen…',
+        examples: [
+            { label: 'naam + telefoon + e-mail + adres', text: 'Bel Jan de Vries op 06-12345678 of stuur een mail naar jan@voorbeeld.nl. Hij woont op Keizersgracht 1, 1015 CJ.' },
+            { label: 'BSN + IBAN', text: 'Mijn BSN is 111222333 en mijn IBAN is NL91ABNA0417164300.' },
+            { label: 'geen PII (rollen/leeftijd)', text: 'Mijn moeder is 62 jaar en heeft last van hoofdpijn. Ze gaat naar de huisarts.' },
+        ],
+        simulatedResponse(tokens) {
+            if (!tokens.length) return 'Bedankt voor uw vraag. Wij hebben uw vraag ontvangen en zullen zo snel mogelijk reageren.'
+            return `Bedankt voor uw vraag. Wij hebben uw gegevens ontvangen (${tokens.join(' en ')}) en nemen zo spoedig mogelijk contact op.`
+        },
+    },
+    en: {
+        subtitle:         'PII detection for English text, client-side via Gemini Nano or regex fallback',
+        step1:            'Enter a question containing personal data',
+        step2:            'Sent to server (PII removed)',
+        step3:            'Simulated server response',
+        step3hint:        'Edit the response below. The server only knows the tokens — modify them or leave them as-is.',
+        step4:            'Shown to user (personal data restored)',
+        step2empty:       'No question sent yet.',
+        step4empty:       'No answer restored yet.',
+        examplesLabel:    'Examples:',
+        redactBtn:        'Filter & send',
+        restoreBtn:       'Restore personal data →',
+        processingLabel:  'Processing…',
+        footerNote:       'PII stays in the browser — never sent to the server',
+        noPiiFound:       '(no PII found)',
+        statusChecking:   'Checking LanguageModel API…',
+        statusAvailable:  'Gemini Nano available — names and addresses are also detected',
+        statusDownloading:'Downloading Gemini Nano… (model is ~1.7 GB, this may take a while)',
+        statusDownload2:  'Gemini Nano is already downloading in the background…',
+        statusUnavailable:'LanguageModel: {avail} — regex detection only (email, phone, postcode, IBAN)',
+        statusNotFound:   'LanguageModel API not found — regex detection only (email, phone, postcode, IBAN)',
+        switchingLocale:  'Switching language…',
+        examples: [
+            { label: 'name + phone + email + address', text: 'Call Jane Smith on +44 7700 900123 or email jane@example.co.uk. She lives at 10 Downing Street, SW1A 2AA.' },
+            { label: 'IBAN', text: 'Transfer to GB29NWBK60161331926819 by end of day.' },
+            { label: 'no PII (roles/ages)', text: 'My mother is 62 years old and has a headache. She is going to see the doctor.' },
+        ],
+        simulatedResponse(tokens) {
+            if (!tokens.length) return 'Thank you for your question. We have received your message and will respond as soon as possible.'
+            return `Thank you for your question. We have received your details (${tokens.join(' and ')}) and will be in touch shortly.`
+        },
+    },
+}
 
 // ── token highlight helpers ───────────────────────────────────────────────────
 const TOKEN_RE = /(\[[A-Z]+_\d+\])/g
@@ -440,40 +531,17 @@ function renderRedacted(text) {
     )
 }
 
-function renderRestored(original, restored) {
-    // Find tokens in original and highlight the values that replaced them
-    // by comparing original vs restored character by character would be complex,
-    // so instead we highlight spans in the restored text that correspond to
-    // segments that were tokens in the original.
-    const parts = original.split(TOKEN_RE)
-    let restoredCursor = restored
-    let html = ''
-
-    for (const part of parts) {
-        if (TOKEN_RE.test(part)) {
-            TOKEN_RE.lastIndex = 0
-            // This part is a token — figure out what it resolved to
-            // by finding the corresponding span in the restored text
-            // We use a simpler approach: just highlight all of restored
-            // We can get the restored value by checking the restored text
-        }
-    }
-
-    // Simpler approach: mark restored segments by diffing
-    // For demo purposes, just show the text with a note
-    return restored
-}
-
 // ── UI helpers ────────────────────────────────────────────────────────────────
-const questionEl = document.getElementById('question')
-const redactBtn  = document.getElementById('redact-btn')
-const restoreBtn = document.getElementById('restore-btn')
-const redactedEl = document.getElementById('redacted-output')
-const piiListEl  = document.getElementById('pii-list')
-const serverEl   = document.getElementById('server-response')
-const restoredEl = document.getElementById('restored-output')
-const statusDot  = document.getElementById('status-dot')
-const statusText = document.getElementById('status-text')
+const questionEl  = document.getElementById('question')
+const redactBtn   = document.getElementById('redact-btn')
+const restoreBtn  = document.getElementById('restore-btn')
+const redactedEl  = document.getElementById('redacted-output')
+const piiListEl   = document.getElementById('pii-list')
+const serverEl    = document.getElementById('server-response')
+const restoredEl  = document.getElementById('restored-output')
+const statusDot   = document.getElementById('status-dot')
+const statusText  = document.getElementById('status-text')
+const langBtns    = document.querySelectorAll('.lang-btn')
 
 function setStatus(state, text) {
     statusDot.className = `status-dot ${state}`
@@ -485,13 +553,65 @@ function setProcessing(btn, label) {
     btn.innerHTML = `<span class="processing"><span class="spinner"></span>${label}</span>`
 }
 
-// ── initialise filter ─────────────────────────────────────────────────────────
-let filter = null
+function applyLocaleUI(lang) {
+    const t = I18N[lang]
+    document.documentElement.lang = lang
+    document.getElementById('header-subtitle').textContent  = t.subtitle
+    document.getElementById('step1-title').textContent      = t.step1
+    document.getElementById('step2-title').textContent      = t.step2
+    document.getElementById('step3-title').textContent      = t.step3
+    document.getElementById('step3-hint').textContent       = t.step3hint
+    document.getElementById('step4-title').textContent      = t.step4
+    document.getElementById('step2-empty').textContent      = t.step2empty
+    document.getElementById('step4-empty').textContent      = t.step4empty
+    document.getElementById('examples-label').textContent   = t.examplesLabel
+    document.getElementById('redact-btn-label').textContent = t.redactBtn
+    document.getElementById('restore-btn-label').textContent= t.restoreBtn
+    document.getElementById('footer-note').textContent      = t.footerNote
+    questionEl.placeholder = t.examples[0]?.text ?? ''
 
-;(async () => {
-    setStatus('checking', 'Controleren van LanguageModel API…')
+    // Rebuild example chips
+    const container = document.getElementById('examples-container')
+    // Keep the label span, remove old chips
+    const chips = container.querySelectorAll('.example-chip')
+    chips.forEach(c => c.remove())
+
+    for (const ex of t.examples) {
+        const btn = document.createElement('button')
+        btn.className = 'example-chip'
+        btn.dataset.example = ex.text
+        btn.textContent = ex.label
+        btn.addEventListener('click', () => {
+            questionEl.value = ex.text
+        })
+        container.appendChild(btn)
+    }
+
+    langBtns.forEach(b => b.classList.toggle('active', b.dataset.lang === lang))
+}
+
+// ── filter state ──────────────────────────────────────────────────────────────
+let filter = null
+let currentLang = 'nl'
+
+async function initFilter(lang) {
+    if (filter) {
+        filter.destroy()
+        filter = null
+    }
+
+    const t = I18N[lang]
+    redactBtn.disabled = true
+    setStatus('checking', t.statusChecking)
 
     filter = await createPiiFilter({
+        language: lang,
+        onDownloadProgress: ({ loaded, total }) => {
+            const pct = total ? Math.round((loaded / total) * 100) : 0
+            const mb = (loaded / 1024 / 1024).toFixed(0)
+            const totalMb = total ? (total / 1024 / 1024).toFixed(0) : '?'
+            setStatus('checking', `${t.statusDownloading.split('…')[0]}… ${pct}% (${mb} / ${totalMb} MB)`)
+        },
         onPiiFound: ({ replacements }) => {
             piiListEl.innerHTML = ''
             for (const { token, type, source } of replacements) {
@@ -500,8 +620,8 @@ let filter = null
                 badge.className = 'pii-badge'
                 badge.innerHTML = `
                     <span class="pii-badge-dot"></span>
-                    ${type}
-                    <span class="pii-badge-token">${token}</span>
+                    ${escHtml(type)}
+                    <span class="pii-badge-token">${escHtml(token)}</span>
                     <span class="pii-badge-source ${source}">${sourceLabel}</span>
                 `
                 piiListEl.appendChild(badge)
@@ -514,29 +634,51 @@ let filter = null
         try {
             const avail = await LanguageModel.availability({ expectedInputs: [{ type: 'text' }] })
             if (avail === 'available') {
-                setStatus('available', 'LanguageModel (Gemini Nano) beschikbaar — namen en adressen worden ook gedetecteerd')
+                setStatus('available', t.statusAvailable)
+            } else if (avail === 'downloadable') {
+                setStatus('checking', t.statusDownloading)
+            } else if (avail === 'downloading') {
+                setStatus('checking', t.statusDownload2)
             } else {
-                setStatus('unavailable', `LanguageModel: ${avail} — alleen regex-detectie (e-mail, telefoon, postcode, IBAN, BSN)`)
+                setStatus('unavailable', t.statusUnavailable.replace('{avail}', avail))
             }
         } catch {
-            setStatus('unavailable', 'LanguageModel niet beschikbaar — alleen regex-detectie actief')
+            setStatus('unavailable', t.statusNotFound)
         }
     } else {
-        setStatus('unavailable', 'LanguageModel API niet gevonden — alleen regex-detectie actief (regex detecteert e-mail, telefoon, postcode, IBAN, BSN)')
+        setStatus('unavailable', t.statusNotFound)
     }
 
     redactBtn.disabled = false
-    redactBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Filter en verstuur
-    `
-})()
+    document.getElementById('redact-btn-label').textContent = t.redactBtn
+}
 
-// ── example chips ─────────────────────────────────────────────────────────────
-document.querySelectorAll('.example-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-        questionEl.value = chip.dataset.example
-        questionEl.dispatchEvent(new Event('input'))
+// ── boot ──────────────────────────────────────────────────────────────────────
+applyLocaleUI('nl')
+initFilter('nl')
+
+// ── language switcher ─────────────────────────────────────────────────────────
+langBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const lang = btn.dataset.lang
+        if (lang === currentLang) return
+        currentLang = lang
+
+        langBtns.forEach(b => b.disabled = true)
+        applyLocaleUI(lang)
+
+        // Reset UI state
+        redactedEl.className = 'result-panel'
+        redactedEl.innerHTML = `<span class="empty">${escHtml(I18N[lang].step2empty)}</span>`
+        piiListEl.innerHTML = ''
+        serverEl.value = ''
+        restoredEl.className = 'result-panel'
+        restoredEl.innerHTML = `<span class="empty">${escHtml(I18N[lang].step4empty)}</span>`
+        restoreBtn.disabled = true
+        questionEl.value = ''
+
+        await initFilter(lang)
+        langBtns.forEach(b => b.disabled = false)
     })
 })
 
@@ -545,16 +687,17 @@ redactBtn.addEventListener('click', async () => {
     const text = questionEl.value.trim()
     if (!text || !filter) return
 
-    const originalLabel = redactBtn.innerHTML
-    setProcessing(redactBtn, 'Verwerken…')
+    const t = I18N[currentLang]
+    const originalLabel = document.getElementById('redact-btn-label').textContent
+    setProcessing(redactBtn, t.processingLabel)
 
     // Clear previous state
     piiListEl.innerHTML = ''
     redactedEl.className = 'result-panel'
-    redactedEl.innerHTML = '<span class="empty">Verwerken…</span>'
+    redactedEl.innerHTML = `<span class="empty">${t.processingLabel}</span>`
     serverEl.value = ''
     restoredEl.className = 'result-panel'
-    restoredEl.innerHTML = '<span class="empty">Nog geen antwoord hersteld.</span>'
+    restoredEl.innerHTML = `<span class="empty">${escHtml(t.step4empty)}</span>`
     restoreBtn.disabled = true
 
     try {
@@ -562,20 +705,21 @@ redactBtn.addEventListener('click', async () => {
 
         if (redacted === text) {
             redactedEl.className = 'result-panel'
-            redactedEl.innerHTML = `<em style="color:var(--green)">${escHtml(text)}</em> <span style="font-size:12px;color:var(--gray-400)">(geen PII gevonden)</span>`
+            redactedEl.innerHTML = `<em style="color:var(--green)">${escHtml(text)}</em> <span style="font-size:12px;color:var(--gray-400)">${escHtml(t.noPiiFound)}</span>`
             piiListEl.innerHTML = ''
         } else {
             redactedEl.className = 'result-panel is-redacted'
             redactedEl.innerHTML = renderRedacted(escHtml(redacted))
         }
 
-        // Pre-populate server response with a natural sentence using the tokens
-        serverEl.value = buildSimulatedResponse(redacted)
+        // Pre-populate server response
+        const tokens = [...redacted.matchAll(/\[[A-Z]+_\d+\]/g)].map(m => m[0])
+        serverEl.value = t.simulatedResponse(tokens)
         restoreBtn.disabled = false
 
     } finally {
         redactBtn.disabled = false
-        redactBtn.innerHTML = originalLabel
+        document.getElementById('redact-btn-label').textContent = originalLabel
     }
 })
 
@@ -598,18 +742,6 @@ function escHtml(str) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-}
-
-function buildSimulatedResponse(redacted) {
-    // Extract tokens from the redacted text to build a plausible server response
-    const tokens = [...redacted.matchAll(/\[[A-Z]+_\d+\]/g)].map(m => m[0])
-
-    if (tokens.length === 0) {
-        return 'Bedankt voor uw vraag. Wij hebben uw vraag ontvangen en zullen zo snel mogelijk reageren.'
-    }
-
-    const tokenList = tokens.join(' en ')
-    return `Bedankt voor uw vraag. Wij hebben uw gegevens ontvangen (${tokenList}) en nemen zo spoedig mogelijk contact op.`
 }
 </script>
 

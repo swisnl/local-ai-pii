@@ -31,12 +31,13 @@ Detecteer NIET:
 - Bedrijven, organisaties of instellingen
 
 Geef je antwoord als een JSON-array van gevonden PII-entiteiten.
-Elke entiteit heeft een "type" (een van: NAAM, EMAIL, ADRES, POSTCODE, TELEFOON, BSN, IBAN) en een "value" (de exacte tekst).
+Elke entiteit heeft een "type" (een van: NAME, EMAIL, ADDRESS, POSTCODE, PHONE, BSN, IBAN) en een "value" (de exacte tekst).
 Als er geen PII is gevonden, geef dan een lege array terug.`
 
 /**
  * JSON Schema for the responseConstraint option of LanguageModel.prompt().
  * Forces the model to return a valid JSON array of PII entities.
+ * Token keys are language-neutral English regardless of locale.
  */
 export const PII_EXTRACTION_SCHEMA = {
     type: 'array',
@@ -47,7 +48,7 @@ export const PII_EXTRACTION_SCHEMA = {
         properties: {
             type: {
                 type: 'string',
-                enum: ['NAAM', 'EMAIL', 'ADRES', 'POSTCODE', 'TELEFOON', 'BSN', 'IBAN'],
+                enum: ['NAME', 'EMAIL', 'ADDRESS', 'POSTCODE', 'PHONE', 'BSN', 'IBAN'],
             },
             value: { type: 'string' },
         },
@@ -76,10 +77,10 @@ export function buildInitialPrompts() {
         {
             role: 'assistant',
             content: JSON.stringify([
-                { type: 'NAAM', value: 'Jan de Vries' },
-                { type: 'TELEFOON', value: '06-12345678' },
+                { type: 'NAME', value: 'Jan de Vries' },
+                { type: 'PHONE', value: '06-12345678' },
                 { type: 'EMAIL', value: 'jan@voorbeeld.nl' },
-                { type: 'ADRES', value: 'Keizersgracht 1' },
+                { type: 'ADDRESS', value: 'Keizersgracht 1' },
                 { type: 'POSTCODE', value: '1015 CJ' },
             ]),
         },

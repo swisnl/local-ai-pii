@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createDetector } from '../src/detector.js'
 import { PiiSession } from '../src/session.js'
+import { nl } from '../src/locales/nl.js'
 
 // Helper: create a mintToken function backed by a real PiiSession
 function makeSession() {
@@ -35,7 +36,7 @@ describe('createDetector — regex-only (no LanguageModel)', () => {
     })
 
     it('redacts an email address without LLM', async () => {
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('Stuur naar jan@example.com', mintToken, undefined)
@@ -46,15 +47,15 @@ describe('createDetector — regex-only (no LanguageModel)', () => {
     })
 
     it('redacts a Dutch phone number', async () => {
-        const detector = await createDetector({ activeKeys: new Set(['TELEFOON']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['PHONE']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('Bel 0612345678', mintToken, undefined)
-        expect(result.text).toBe('Bel [TELEFOON_1]')
+        expect(result.text).toBe('Bel [PHONE_1]')
     })
 
     it('returns unchanged text when no PII found', async () => {
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('Geen PII hier', mintToken, undefined)
@@ -63,7 +64,7 @@ describe('createDetector — regex-only (no LanguageModel)', () => {
     })
 
     it('returns unchanged text for empty input', async () => {
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('', mintToken, undefined)
@@ -71,7 +72,7 @@ describe('createDetector — regex-only (no LanguageModel)', () => {
     })
 
     it('applies the same token for the same value appearing twice', async () => {
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect(
@@ -90,22 +91,22 @@ describe('createDetector — with mocked LanguageModel', () => {
 
     it('uses LLM entities for contextual PII like names', async () => {
         vi.stubGlobal('LanguageModel', mockLanguageModel([
-            { type: 'NAAM', value: 'Jan de Vries' },
+            { type: 'NAME', value: 'Jan de Vries' },
         ]))
 
-        const detector = await createDetector({ activeKeys: new Set(['NAAM', 'EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['NAME', 'EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('Bel Jan de Vries morgen.', mintToken, undefined)
-        expect(result.text).toBe('Bel [NAAM_1] morgen.')
+        expect(result.text).toBe('Bel [NAME_1] morgen.')
     })
 
     it('combines regex and LLM results', async () => {
         vi.stubGlobal('LanguageModel', mockLanguageModel([
-            { type: 'NAAM', value: 'Jan de Vries' },
+            { type: 'NAME', value: 'Jan de Vries' },
         ]))
 
-        const detector = await createDetector({ activeKeys: new Set(['NAAM', 'EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['NAME', 'EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect(
@@ -113,7 +114,7 @@ describe('createDetector — with mocked LanguageModel', () => {
             mintToken,
             undefined
         )
-        expect(result.text).toContain('[NAAM_1]')
+        expect(result.text).toContain('[NAME_1]')
         expect(result.text).toContain('[EMAIL_1]')
     })
 
@@ -128,10 +129,10 @@ describe('createDetector — with mocked LanguageModel', () => {
         })
         vi.stubGlobal('LanguageModel', lm)
 
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL', 'NAAM']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL', 'NAME']) })
         const { mintToken } = makeSession()
 
-        // Should still redact email via regex; NAAM silently skipped
+        // Should still redact email via regex; NAME silently skipped
         const result = await detector.detect(
             'Schrijf Jan op jan@example.com',
             mintToken,
@@ -143,12 +144,12 @@ describe('createDetector — with mocked LanguageModel', () => {
 
     it('skips LLM entities that are not in activeKeys', async () => {
         vi.stubGlobal('LanguageModel', mockLanguageModel([
-            { type: 'NAAM', value: 'Jan de Vries' },
-            { type: 'ADRES', value: 'Keizersgracht 1' },
+            { type: 'NAME', value: 'Jan de Vries' },
+            { type: 'ADDRESS', value: 'Keizersgracht 1' },
         ]))
 
-        // Only NAAM is active — ADRES should not be redacted
-        const detector = await createDetector({ activeKeys: new Set(['NAAM']) })
+        // Only NAME is active — ADDRESS should not be redacted
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['NAME']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect(
@@ -156,7 +157,7 @@ describe('createDetector — with mocked LanguageModel', () => {
             mintToken,
             undefined
         )
-        expect(result.text).toContain('[NAAM_1]')
+        expect(result.text).toContain('[NAME_1]')
         expect(result.text).toContain('Keizersgracht 1')
     })
 
@@ -166,7 +167,7 @@ describe('createDetector — with mocked LanguageModel', () => {
             { type: 'EMAIL', value: 'jan@example.com' },
         ]))
 
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         const { mintToken } = makeSession()
 
         const result = await detector.detect('Mail jan@example.com', mintToken, undefined)
@@ -188,7 +189,7 @@ describe('createDetector — LanguageModel unavailable', () => {
             create: vi.fn(),
         })
 
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unavailable'))
 
         const { mintToken } = makeSession()
@@ -204,7 +205,7 @@ describe('createDetector — LanguageModel unavailable', () => {
             availability: vi.fn().mockRejectedValue(new Error('not supported')),
         })
 
-        const detector = await createDetector({ activeKeys: new Set(['EMAIL']) })
+        const detector = await createDetector({ locale: nl, activeKeys: new Set(['EMAIL']) })
         expect(warnSpy).toHaveBeenCalled()
 
         warnSpy.mockRestore()

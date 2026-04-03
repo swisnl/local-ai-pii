@@ -55,10 +55,10 @@ describe('PII_EXTRACTION_SCHEMA', () => {
 
     it('enumerates the expected PII types', () => {
         const types = PII_EXTRACTION_SCHEMA.items.properties.type.enum
-        expect(types).toContain('NAAM')
+        expect(types).toContain('NAME')
         expect(types).toContain('EMAIL')
-        expect(types).toContain('TELEFOON')
-        expect(types).toContain('ADRES')
+        expect(types).toContain('PHONE')
+        expect(types).toContain('ADDRESS')
         expect(types).toContain('POSTCODE')
         expect(types).toContain('BSN')
         expect(types).toContain('IBAN')
@@ -68,7 +68,7 @@ describe('PII_EXTRACTION_SCHEMA', () => {
 describe('validateEntities', () => {
     it('accepts a valid array', () => {
         const input = [
-            { type: 'NAAM', value: 'Jan de Vries' },
+            { type: 'NAME', value: 'Jan de Vries' },
             { type: 'EMAIL', value: 'jan@example.com' },
         ]
         expect(validateEntities(input)).toHaveLength(2)
@@ -82,21 +82,21 @@ describe('validateEntities', () => {
 
     it('filters out entries with unknown type', () => {
         const input = [
-            { type: 'NAAM', value: 'Jan' },
+            { type: 'NAME', value: 'Jan' },
             { type: 'UNKNOWN', value: 'something' },
         ]
         const result = validateEntities(input)
         expect(result).toHaveLength(1)
-        expect(result[0].type).toBe('NAAM')
+        expect(result[0].type).toBe('NAME')
     })
 
     it('filters out entries with missing value', () => {
-        const input = [{ type: 'NAAM' }, { type: 'EMAIL', value: '' }]
+        const input = [{ type: 'NAME' }, { type: 'EMAIL', value: '' }]
         expect(validateEntities(input)).toHaveLength(0)
     })
 
     it('filters out null entries in the array', () => {
-        const input = [null, { type: 'NAAM', value: 'Jan' }]
+        const input = [null, { type: 'NAME', value: 'Jan' }]
         expect(validateEntities(input)).toHaveLength(1)
     })
 })
